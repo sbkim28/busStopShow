@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html>
+<head>
+<% include ../public/header.html %>
+<script src='https://d3js.org/d3.v4.min.js'></script>
+</head>
+<script>
+$(document).ready(function(){
+	
+	$('#query').keypress(function(e){
+		if(e.which==13){
+			search()
+		}
+	})
+	$('#search').click(function(){
+		search()
+	})
+	
+	var search = function(){
+		var query = $('#query').val()
+		if(query == ''){
+			alert('검색할 버스 정류장을 입력해 주십시오.');
+			return false;
+		}
+		d3.json('/busStop/find/'+query,draw);
+	}
+	
+	var draw = function(data){
+		
+		$('#container-dataView').empty();
+		
+		var width = 1000;
+		var height = Math.ceil((data.length/4))*100;
+		height = height + (5 * Math.ceil((data.length/4)))
+		var svg = window.svg = d3.select('#container-dataView')
+			.append('svg')
+			.attr('width',width)
+			.attr('height',height)
+			.attr('class','drawBoard')
+			
+			
+		var g = svg.selectAll('.drawBoard')
+			.data(data)
+			.enter()
+			.append('g')
+			.attr('id',function(js,index){
+				return js.BUSSTOP_ID;
+			})
+			.attr('transform','translate('+0+','+0+')')
+			.on('click',function(){
+				var value = $(this).attr('id');
+				onClick(value);
+			})
+			
+		g.append('rect')
+			.transition()
+			.duration(500)
+			.delay(function(js,index){
+				return index * 50;
+			})
+			.attr('x',function(js,index){
+				var x = index * (width / 4);
+				if(x!=0){
+					 x=x%width;
+				}else{
+					x=0;
+				}
+				return x+(5*(index%4)) +5;
+			})
+			.attr('y',function(js,index){
+				var line = Math.ceil(((index*(width/4))+1)/width);
+				line --;
+				return (line * 100)+(5*line)+5;
+			})
+			.attr('width',width/4)
+			.attr('height',100)
+			.attr('fill','white')
+			.attr('id',function(js,index){
+				return js.BUSSTOP_ID;
+			})
+		g.append('a')
+		.append('text')
+			.text(function(js,index){
+				return js.BUSSTOP_NAME;
+			})
+			.attr('x',function(js,index){
+				var x = index * (width / 4);
+				if(x!=0){
+					 x=x%width;
+				}else{
+					x=0;
+				}
+				x = x+(5*(index%4)) +5;
+				x = (x + (x+225))/2
+				return x
+			})
+			.attr('y',function(js,index){
+				var line = Math.ceil(((index*(width/4))+1)/width);
+				line --;
+				var y = (line * 100)+(5*line)+5;
+				y = (y + (y +70))/2;
+				return y;
+			})
+			.attr('fill','black')
+			.attr('font-size','16px')
+			.attr('text-anchor','middle')
+		g.append('text')
+			.text(function(js,index){
+				return "다음 정류장 : " + js.NEXT_BUSSTOP;
+			})
+			.attr('x',function(js,index){
+				var x = index * (width / 4);
+				if(x!=0){
+					 x=x%width;
+				}else{
+					x=0;
+				}
+				x = x+(5*(index%4)) +5;
+				x = (x + (x+225))/2
+				return x;
+			})
+			.attr('y',function(js,index){
+				var line = Math.ceil(((index*(width/4))+1)/width);
+				line --;
+				var y = (line * 100)+(5*line)+5;
+				y = (y + (y +120))/2;
+				return y;
+			})
+			.attr('fill','black')
+			.attr('font-size','14px')
+			.attr('text-anchor','middle');
+	}
+	
+	var onClick = function(busstop_id){
+		
+		$('g').each(function(index){
+			$(this).off('click');
+			$(this).delay(index*75).animate({opacity:'0'},{duration:'slow',complete:function(){
+				if(index == $('g').length-1){
+					$('#container-dataView').empty();
+					drawCircle(busstop_id);
+				}
+			}});
+		});
+	}
+	
+	var drawCircle = function(busstop_id){
+		
+		var width = 1000;
+		var height = 1000;
+		var radius = Math.min(width,height)/3;
+		var colorA = ['Crimson','Gold','ForestGreen','Indigo','DeepSkyBlue']
+		var colorSet = d3.scaleOrdinal().range(colorA);
+		
+		var svg = window.svg = d3.select('#container-dataView')
+			.append('svg')
+			.attr('width',width)
+			.attr('height',height);
+		var busStopInfo = {};
+		$.ajax({
+			type:'GET',
+			url:'/busStop/idFind/'+busstop_id,
+			success:function(data){
+				var busStopInfo = data;
+				var busLineKind= {};
+				$.ajax({
+					type:'GET',
+					url:'/bus/detail',
+					success:function(data){
+						busLineKind = data;
+			
+		
+		
+		
+		d3.json('/bus/find/'+busstop_id,function(error,json){
+			if(json == null){
+				svg.append('circle')
+				.attr('cx',width/2)
+				.attr('cy',height/2)
+				.attr('r',radius)
+				.attr('fill','none')
+				.attr('stroke','white')
+				.attr('stroke-width','10');
+			
+			svg.append('g')
+				.attr('class','mainCircle')
+				.append('circle')
+				.attr('cx',(width)/2)
+				.attr('cy',(height)/2)
+				.attr('r',radius-90)
+				.attr('fill','white')
+				.attr('stroke','gray')
+				.attr('stroke-width','10');
+			
+			svg.selectAll('.mainCircle')
+				.append('text')
+				.attr('class','bus_info')
+				.attr('x',(width)/2)
+				.attr('y',(height)/2)
+				.attr('fill','black')
+				.attr('font-size','18px')
+				.attr('text-anchor','middle')
+				.text('Error(Type:FindError)<데이터가 존제하지 않습니다>');
+				
+			svg.append('g')
+				.attr('class','backButton')
+				.on('click',function(){
+					search();
+				})
+				.append('rect')
+				.attr('x',10)
+				.attr('y',10)
+				.attr('width',100)
+				.attr('height',40)
+				.attr('fill','white')
+				.attr('stroke','gray')
+				.attr('stroke-width',5)
+				
+			svg.selectAll('.backButton')
+				.append('text')
+				.attr('x',55)
+				.attr('y',30)
+				.text('리스트 보기')
+				.attr('fill','black')
+				.attr('font-size','15px')
+				.attr('text-anchor','middle');
+			return false;
+			}
+			var length = json.length;
+			
+			
+			//orbit
+			svg.append('circle')
+				.attr('cx',width/2)
+				.attr('cy',height/2)
+				.attr('r',radius)
+				.attr('fill','none')
+				.attr('stroke','white')
+				.attr('stroke-width','10');
+			
+			svg.append('g')
+				.attr('class','mainCircle')
+				.append('circle')
+				.attr('cx',(width)/2)
+				.attr('cy',(height)/2)
+				.attr('r',radius-90)
+				.attr('fill','white')
+				.attr('stroke','gray')
+				.attr('stroke-width','10');
+			
+			svg.selectAll('.mainCircle')
+				.append('text')
+				.attr('class','bus_info')
+				.attr('x',(width)/2)
+				.attr('y',(height)/2 - 100)
+				.attr('fill','black')
+				.attr('font-size','18px')
+				.attr('text-anchor','middle')
+				.text('찾고 싶은 노선 명에 해당하는 원을 클릭하세요')
+				
+			svg.selectAll('.mainCircle')
+				.append('text')
+				.attr('class','CurBusstop')
+				.attr('x',(width)/2)
+				.attr('y',(height)/2 - 70)
+				.attr('fill','black')
+				.attr('font-size','18px')
+				.attr('text-anchor','middle')
+			
+			svg.selectAll('.mainCircle')
+				.append('text')
+				.attr('class','remain_min')
+				.attr('x',(width)/2)
+				.attr('y',(height)/2 - 40)
+				.attr('fill','black')
+				.attr('font-size','18px')
+				.attr('text-anchor','middle')
+			
+			svg.selectAll('.mainCircle')
+				.append('text')
+				.attr('class','remain_stop')
+				.attr('x',(width)/2)
+				.attr('y',(height)/2 - 10)
+				.attr('fill','black')
+				.attr('font-size','18px')
+				.attr('text-anchor','middle')
+				
+			svg.selectAll('.mainCircle')
+				.append('text')
+				.attr('class','line_id')
+				.attr('x',(width)/2)
+				.attr('y',(height)/2 + 20)
+				.attr('fill','black')
+				.attr('font-size','18px')
+				.attr('text-anchor','middle')
+			
+			svg.selectAll('.mainCircle')
+				.append('text')
+				.attr('class','low_bus')
+				.attr('x',(width)/2)
+				.attr('y',(height)/2 + 50)
+				.attr('fill','black')
+				.attr('font-size','18px')
+				.attr('text-anchor','middle')
+				
+			svg.append('text')
+				.attr('x',width/2)
+				.attr('y',30)
+				.attr('fill','white')
+				.attr('font-size','20px')
+				.attr('text-anchor','middle')
+				.text(function(){
+					return "정류장 : "+busStopInfo.BUSSTOP_NAME;
+				});
+			svg.append('text')
+				.attr('x',width/2)
+				.attr('y',45)
+				.attr('fill','white')
+				.attr('font-size','15px')
+				.attr('text-anchor','middle')
+				.text(function(){
+					return "다음 정류장 : "+busStopInfo.NEXT_BUSSTOP;
+				});
+			svg.append('g')
+				.attr('class','backButton')
+				.on('click',function(){
+					search();
+				})
+				.append('rect')
+				.attr('x',10)
+				.attr('y',10)
+				.attr('width',100)
+				.attr('height',40)
+				.attr('fill','white')
+				.attr('stroke','gray')
+				.attr('stroke-width',5)
+				
+			svg.selectAll('.backButton')
+				.append('text')
+				.attr('x',55)
+				.attr('y',30)
+				.text('리스트 보기')
+				.attr('fill','black')
+				.attr('font-size','15px')
+				.attr('text-anchor','middle');
+			
+			var svg1 = svg
+			svg1 = svg.append('g')
+				.attr('id','busCircle');
+			
+			svg1.attr('class','animationCircle')
+				.append('circle')
+				.attr('cx','500')
+				.attr('cy','500')
+				.attr('r','420')
+				.attr('fill','none');
+			
+			var svg1 = svg1.selectAll('#busCircle')
+				.data(json)
+				.enter()
+				.append('g')
+				.attr('class','busMin-container')
+				.attr('id',function(js,index){
+					return js.LINE_NAME;
+				})
+				.on('click',function(js,index){
+					$('[class=busMin-container]').each(function(){
+						var id =  $(this).attr('id');
+						if($(this).attr('id') == js.LINE_NAME){
+							$('[id="'+id+'"] > circle').attr('stroke','Snow');
+							$('.bus_info').text('버스 노선명 : '+id);
+							$('.CurBusstop').text('현제 정류장 : '+js.BUSSTOP_NAME);
+							$('.remain_min').text('도착 예정 시간 : '+js.REMAIN_MIN+'분 후');
+							$('.remain_stop').text('남은 정류장 : '+js.REMAIN_STOP + '개');
+							$('.line_id').text('노선 아이디 : '+js.LINE_ID);
+							if(js.LOW_BUS == 0){
+								$('.low_bus').text('저상버스 : false');
+							}
+							if(js.LOW_BUS == 1){
+								$('.low_bus').text('저상버스 : true');
+							}
+						}else{
+							$('[id="'+id+'"] > circle').attr('stroke','black');
+						}
+					})
+				})
+			
+		
+			svg1.append('circle')
+					.attr('cx',function(js,index){
+						var r = radius;
+						var angle= 360/length * index;
+						var a = (angle + (angle+(360/length)))/2;
+						var radian = a * (Math.PI/180);
+						var cos = 500+(r*Math.cos(radian-(Math.PI/2)));
+						return cos;
+					})
+					.attr('cy',function(js,index){
+						var r = radius;
+						var angle= 360/length * index;
+						var a = (angle + (angle+(360/length)))/2;
+						var radian = a*(Math.PI/180);
+						var sin = 500+(r*Math.sin(radian-(Math.PI/2)));
+						return sin;
+					})
+					.attr('r','50')
+					.attr('fill',function(js,index){
+						var i;
+						
+						busLineKind.forEach((busLine)=>{
+							if(js.LINE_NAME == busLine.LINE_NAME){
+								i=busLine.LINE_KIND-1;
+								console.log(i);
+								return colorSet(colorA[i]);
+								return false;
+							}
+						})
+						return colorSet(colorA[i]);
+					})
+					.attr('stroke','black')
+					.attr('stroke-width','5')
+					
+					
+			svg1.append('text')
+					.attr('x',function(js,index){
+						var r = radius;
+						var angle= 360/length * index;
+						var a = (angle + (angle+(360/length)))/2;
+						var radian = a * (Math.PI/180);
+						var cos = 500+(r*Math.cos(radian-(Math.PI/2)));
+						return cos;
+					})
+					.attr('y',function(js,index){
+						var r = radius;
+						var angle= 360/length * index;
+						var a = (angle + (angle+(360/length)))/2;
+						var radian = a*(Math.PI/180);
+						var sin = 500+(r*Math.sin(radian-(Math.PI/2)));
+						return sin;
+					})
+					.text(function(js,index){
+						var tmp = js.LINE_NAME.split('(');
+						if(!tmp[1]){
+							return tmp[0];
+						}else{
+							return tmp[0] + '\n(' + tmp[1];
+						}
+						
+					})
+					.attr('fill','white')
+					.attr('text-anchor','middle');
+				
+		})
+					}
+				})	
+			}
+		})
+	}
+})
+</script>
+<style>
+.container-dataView {
+	background:black;
+	border:solid LightGray 3px;
+	overflow:auto;
+	width:1020px;
+	height:100%;
+}
+@keyframes rotate {
+    from {transform:rotate(0deg);}
+    to {transform:rotate(360deg);}
+}
+@keyframes revRotate {
+    from {transform:rotate(360deg);}
+    to {transform:rotate(0deg);}
+}
+.animationCircle {
+    transform:rotate(0deg);
+    transform-origin:50% 50%;
+    width:760px;
+    height:760px;
+    animation-name: rotate;
+    animation-duration:120s;
+    animation-iteration-count:infinite;
+    animation-timing-function:linear;
+}
+
+.busMin-container {
+	transform:rotate(360deg);
+    transform-origin:50% 50%;
+    animation-name: revRotate;
+    animation-duration:120s;
+    animation-iteration-count:infinite;
+    animation-timing-function:linear;
+}
+
+</style>
+<body>
+<div class='container'>
+ <h2>버스 정류장 검색</h2>
+ <h5>버스 도착정보를 확인하시려면 상자를 클릭해주세요</h5>
+ <hr>
+ <div class='row'>
+  <div class='col-xs-6'>
+   <input type='text'id='query'class='form-control'placeholder='버스 정류장 검색'>
+  </div>
+  <div class='col-xs-6'>
+   <button type='button'class='btn btn-info'id='search'>
+   <span class='glyphicon glyphicon-search'></span>
+   </button>
+  </div>
+ </div>
+ <hr>
+ <p id='errorConfirm'>
+  <div class='row'>
+   <div id='container-dataView'class='container-dataView'>
+   </div>
+  </div>
+  <hr>
+</div>
+</body>
+</html>
